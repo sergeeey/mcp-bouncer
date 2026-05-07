@@ -1,6 +1,12 @@
 # mcp-bouncer
 
+![PyPI](https://img.shields.io/pypi/v/mcp-bouncer) ![Python](https://img.shields.io/pypi/pyversions/mcp-bouncer) ![License](https://img.shields.io/pypi/l/mcp-bouncer)
+
 Prompt injection blocker for MCP servers and AI agents. Zero dependencies. Pure stdlib. 8 attack classes.
+
+> **Scope:** mcp-bouncer is a heuristic pre-filter — it catches ~90% of automated low-effort injections.
+> It is not an LLM-based guardrail and can be bypassed by a determined attacker.
+> Use it as a fast first layer, not a silver bullet.
 
 ```bash
 pip install mcp-bouncer
