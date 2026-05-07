@@ -1,7 +1,7 @@
-"""Tests for mcp_guard core detection engine."""
+"""Tests for mcp_bouncer core detection engine."""
 
 import pytest
-from mcp_guard import is_safe, scan, sanitize, collect_strings, ScanResult
+from mcp_bouncer import is_safe, scan, sanitize, collect_strings, ScanResult
 
 
 class TestIsSafe:

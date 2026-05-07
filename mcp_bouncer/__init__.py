@@ -1,9 +1,9 @@
-"""mcp-guard: prompt injection blocker for MCP servers and AI agents.
+"""mcp-bouncer: prompt injection blocker for MCP servers and AI agents.
 
 Zero external dependencies. Pure stdlib. Blocks 8 attack classes.
 
 Usage:
-    from mcp_guard import is_safe, scan
+    from mcp_bouncer import is_safe, scan
 
     is_safe("normal text")                    # True
     is_safe("Ignore previous instructions")  # False
@@ -12,7 +12,7 @@ Usage:
     # {"system_override": 1}
 """
 
-from mcp_guard.guard import (
+from mcp_bouncer.guard import (
     HIGH_PRIORITY_CATEGORIES,
     PATTERNS,
     ScanResult,
