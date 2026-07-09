@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-bouncer"
-version = "0.1.0"
+version = "0.2.0"
 description = "Prompt injection blocker for MCP servers and AI agents — zero dependencies, stdlib only"
 readme = "README.md"
 license = "MIT"
