@@ -81,8 +81,12 @@ if HIGH_PRIORITY_CATEGORIES & set(hits):
 
 ## Threat levels
 
-- `HIGH` — block immediately (`command_injection`, `encoding_attack`)
-- `LOW` — log and allow (other categories)
+- `HIGH` — block immediately: `command_injection`, `encoding_attack`, `system_override`, `jailbreak`
+- `LOW` — log and allow: `data_exfil`, `role_injection`, `credential_harvest`, `social_engineering`
+
+> The drop-in hook above only acts on `HIGH`. `LOW` categories are context-dependent
+> (higher false-positive risk) — treat them as signal for logging/alerting, not an
+> automatic block, unless you've tuned them for your own traffic.
 
 ```python
 from mcp_bouncer import scan, ScanResult, HIGH_PRIORITY_CATEGORIES
