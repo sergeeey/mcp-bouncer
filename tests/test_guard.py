@@ -1,6 +1,6 @@
 """Tests for mcp_bouncer core detection engine."""
 
-from mcp_bouncer import is_safe, scan, sanitize, collect_strings, ScanResult
+from mcp_bouncer import ScanResult, collect_strings, is_safe, sanitize, scan
 from mcp_bouncer.guard import HIGH_PRIORITY_CATEGORIES
 
 
@@ -101,7 +101,7 @@ class TestSanitize:
         assert sanitize("hello\x00world") == "helloworld"
 
     def test_removes_zero_width_chars(self):
-        assert sanitize("hello​world") == "helloworld"
+        assert sanitize("hello\u200bworld") == "helloworld"
 
     def test_clean_string_unchanged(self):
         assert sanitize("clean string") == "clean string"
@@ -111,13 +111,16 @@ class TestSanitize:
         assert result == {"key": "value"}
 
     def test_removes_soft_hyphen(self):
-        assert sanitize("a­b") == "ab"
+        # WHY: chr(codepoint), not a pasted literal char -- keeps this file
+        # 100% visible ASCII (unauditable-by-eye chars are exactly what
+        # ruff's PLE2502/PLE2515 rules flag; see guard.py's same pattern).
+        assert sanitize("a" + chr(0x00AD) + "b") == "ab"
 
     def test_removes_word_joiner(self):
-        assert sanitize("a⁠b") == "ab"
+        assert sanitize("a" + chr(0x2060) + "b") == "ab"
 
     def test_removes_bidi_override(self):
-        assert sanitize("a‮b") == "ab"
+        assert sanitize("a" + chr(0x202E) + "b") == "ab"
 
     def test_removes_unicode_tag_char(self):
         assert sanitize("a\U000e0069b") == "ab"
