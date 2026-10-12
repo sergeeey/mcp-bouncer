@@ -1,6 +1,6 @@
 """Tests for mcp_bouncer core detection engine."""
 
-from mcp_bouncer import is_safe, scan, sanitize, collect_strings, ScanResult
+from mcp_bouncer import ScanResult, collect_strings, is_safe, sanitize, scan
 from mcp_bouncer.guard import HIGH_PRIORITY_CATEGORIES
 
 
@@ -102,7 +102,7 @@ class TestSanitize:
 
     def test_maps_zero_width_chars_to_space(self):
         # Spaces (not deletion) prevent sanitize()+scan() keyword fusion (Pilot 2 F03).
-        assert sanitize("hello​world") == "hello world"
+        assert sanitize("hello\u200bworld") == "hello world"
 
     def test_clean_string_unchanged(self):
         assert sanitize("clean string") == "clean string"
@@ -112,13 +112,13 @@ class TestSanitize:
         assert result == {"key": "value"}
 
     def test_maps_soft_hyphen_to_space(self):
-        assert sanitize("a­b") == "a b"
+        assert sanitize("a\u00adb") == "a b"
 
     def test_maps_word_joiner_to_space(self):
-        assert sanitize("a⁠b") == "a b"
+        assert sanitize("a\u2060b") == "a b"
 
     def test_maps_bidi_override_to_space(self):
-        assert sanitize("a‮b") == "a b"
+        assert sanitize("a\u202eb") == "a b"
 
     def test_maps_unicode_tag_char_to_space(self):
         assert sanitize("a\U000e0069b") == "a b"
