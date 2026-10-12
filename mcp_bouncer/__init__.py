@@ -23,13 +23,13 @@ from mcp_bouncer.guard import (
 )
 
 __all__ = [
-    "is_safe",
-    "scan",
-    "sanitize",
-    "collect_strings",
-    "PATTERNS",
     "HIGH_PRIORITY_CATEGORIES",
+    "PATTERNS",
     "ScanResult",
+    "collect_strings",
+    "is_safe",
+    "sanitize",
+    "scan",
 ]
 
 __version__ = "0.2.0"
