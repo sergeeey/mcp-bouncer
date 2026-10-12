@@ -8,7 +8,10 @@ Threat levels:
            system_override, jailbreak)
 """
 
+from __future__ import annotations
+
 import re
+import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -37,15 +40,18 @@ def _invisible_char_class() -> str:
 # shared by encoding_attack detection AND sanitize() so both cover the same
 # set (previously sanitize() only stripped 4 chars, missing this entirely).
 ENCODING_PATTERN = re.compile(rf"\x00|[{_invisible_char_class()}]|[\U000e0000-\U000e007f]")
-SANITIZE_PATTERN = ENCODING_PATTERN
+# Null bytes are removed; other invisibles become spaces so sanitize()+scan()
+# cannot fuse "ignore<ZWSP>previous" into an undetectable token (Pilot 2 F03).
+_INVISIBLE_TO_SPACE = re.compile(rf"[{_invisible_char_class()}]|[\U000e0000-\U000e007f]")
 
 # WHY: only flag backtick spans containing a recognized dangerous command/shell
 # metachar, not ANY backtick content — the old `(?!-)[^`]+` matched `git status`,
 # `npm test`, any code reference, guaranteeing false positives that get the hook
 # disabled. `whoami` etc. stay flagged (test_command_injection_unsafe requires it).
+# Pilot 2: add bash|sh|python — `` `bash -c id` `` was a confirmed bypass.
 _DANGEROUS_CMD = (
     r"rm|whoami|curl|wget|chmod|chown|sudo|dd|mkfs|shutdown|reboot|kill|"
-    r"passwd|nc|ncat|ssh|scp|eval|exec|base64|useradd|userdel"
+    r"passwd|nc|ncat|ssh|scp|eval|exec|base64|useradd|userdel|bash|sh|python|perl"
 )
 
 PATTERNS: dict[str, re.Pattern[str]] = {
@@ -54,8 +60,9 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     # their own, verified false positives on ordinary text ("You are now connected
     # to the server.", "the parser would forget previous state on reload."). See
     # jailbreak's "pretend you" removal for the same reasoning.
+    # Pilot 2 F02: optional "your" — "Ignore your previous instructions".
     "system_override": re.compile(
-        r"ignore\s+(all\s+|the\s+)?(previous|prior|above|earlier)|"
+        r"ignore\s+(all\s+|the\s+|your\s+)?(previous|prior|above|earlier)|"
         r"disregard\s+(all\s+|the\s+)?(previous|prior|above|earlier|instructions?)|"
         r"forget\s+(all\s+|everything\s+)?"
         r"(you\s+(were|have\s+been)\s+told|(previous|prior)\s+(instructions?|rules?|directives?))|"
@@ -66,8 +73,9 @@ PATTERNS: dict[str, re.Pattern[str]] = {
     # text like "pretend you are a helpful assistant for kids". The more specific,
     # actually-dangerous form ("pretend ... without/ignoring/bypass ...") is already
     # covered by social_engineering below.
+    # Pilot 2 F05: optional "all" in "bypass all safety".
     "jailbreak": re.compile(
-        r"D\s*A\s*N\s+mode|jailbreak|bypass safety",
+        r"D\s*A\s*N\s+mode|jailbreak|bypass\s+(all\s+)?safety",
         re.IGNORECASE,
     ),
     "encoding_attack": ENCODING_PATTERN,
@@ -83,10 +91,12 @@ PATTERNS: dict[str, re.Pattern[str]] = {
         r"what is your api key|show me your token|print your password",
         re.IGNORECASE,
     ),
+    # Pilot 2 F01: optional whitespace after ; | &&
+    # Pilot 2 F06: $(...) only with dangerous command — bare $(date) is FP.
     "command_injection": re.compile(
-        # WHY: negative lookbehind (?<!\| ) excludes markdown table cells
-        # like `| --flag |` while still catching `whoami`, `dangerous_cmd`.
-        rf"; rm |\| cat /etc|&& curl|\$\(|(?<!\| )`(?:{_DANGEROUS_CMD})\b[^`]*`",
+        rf";\s*rm\b|\|\s*cat\b|&&\s*(?:curl|rm|wget)\b|"
+        rf"\$\((?:{_DANGEROUS_CMD})\b|"
+        rf"(?<!\| )`(?:{_DANGEROUS_CMD})\b[^`]*`",
         re.IGNORECASE,
     ),
     "social_engineering": re.compile(
@@ -152,15 +162,33 @@ def collect_strings(value: Any) -> list[str]:
     return []
 
 
+def _sanitize_str(text: str) -> str:
+    """Strip nulls; map other invisibles to spaces (no keyword fusion)."""
+    without_null = text.replace("\x00", "")
+    return _INVISIBLE_TO_SPACE.sub(" ", without_null)
+
+
 def sanitize(value: Any) -> Any:
-    """Recursively strip null bytes and zero-width characters."""
+    """Recursively strip null bytes; map zero-width/invisible chars to spaces.
+
+    Spaces (not deletion) prevent sanitize()+scan() from fusing split keywords
+    like ``ignore<ZWSP>previous`` into ``ignoreprevious`` (Pilot 2 F03).
+    """
     if isinstance(value, str):
-        return SANITIZE_PATTERN.sub("", value)
+        return _sanitize_str(value)
     if isinstance(value, dict):
         return {k: sanitize(v) for k, v in value.items()}
     if isinstance(value, list):
         return [sanitize(item) for item in value]
     return value
+
+
+def _fold_for_keywords(text: str) -> str:
+    """NFKC + strip combining marks so fullwidth/accent evasions still match."""
+    nfkc = unicodedata.normalize("NFKC", text)
+    return "".join(
+        ch for ch in unicodedata.normalize("NFD", nfkc) if unicodedata.category(ch) != "Mn"
+    )
 
 
 def scan(strings: list[str]) -> dict[str, int]:
@@ -175,7 +203,8 @@ def scan(strings: list[str]) -> dict[str, int]:
         # WHY: strip invisible chars before scanning other categories — otherwise
         # "ig<word-joiner>nore previous" evades system_override by splitting the
         # keyword across an invisible character the raw-text regex never sees.
-        normalized = ENCODING_PATTERN.sub("", text)
+        # Use spaces (same as sanitize) so fused-token bypasses cannot reappear.
+        normalized = _fold_for_keywords(_INVISIBLE_TO_SPACE.sub(" ", text.replace("\x00", "")))
         for category, pattern in PATTERNS.items():
             if category == "encoding_attack":
                 continue
